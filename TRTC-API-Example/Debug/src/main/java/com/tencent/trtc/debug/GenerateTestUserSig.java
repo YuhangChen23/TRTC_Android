@@ -72,7 +72,7 @@ public class GenerateTestUserSig {
      * Replace it with the actual value when using CND,
      * and replace it with 0 when not using CDN, so that the compilation can pass.
      */
-    public static final int BIZID = PLACEHOLDER;
+    public static final int BIZID = 0;
 
     /**
      * CDN发布功能 混流appId；
@@ -82,7 +82,7 @@ public class GenerateTestUserSig {
      * Replace it with the actual value when using CND,
      * and replace it with 0 when not using CDN, so that the compilation can pass.
      */
-    public static final int APPID = PLACEHOLDER;
+    public static final int APPID = 0;
 
     /**
      * 腾讯云 SDKAppId，需要替换为您自己账号下的 SDKAppId。
@@ -96,7 +96,7 @@ public class GenerateTestUserSig {
      * .com/rav).
      * `SDKAppID` uniquely identifies a Tencent Cloud account.
      */
-    public static final int SDKAPPID = PLACEHOLDER;
+    public static final int SDKAPPID = 1600016022;
 
     /**
      * 签名过期时间，建议不要设置的过短
@@ -133,7 +133,7 @@ public class GenerateTestUserSig {
      * and key to your backend server to prevent key disclosure and traffic stealing.
      * Reference: https://cloud.tencent.com/document/product/647/17275#Server
      */
-    public static final String SECRETKEY = "PLACEHOLDER";
+    public static final String SECRETKEY = "0e25bb4bf49db88852daacc72232607f859219ed6e805149ee72f839a57fe16c";
 
     /**
      * 计算 UserSig 签名

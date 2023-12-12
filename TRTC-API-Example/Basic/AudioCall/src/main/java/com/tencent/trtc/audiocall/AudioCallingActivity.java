@@ -19,6 +19,9 @@ import com.tencent.trtc.TRTCCloudListener;
 import com.tencent.trtc.debug.Constant;
 import com.tencent.trtc.debug.GenerateTestUserSig;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
@@ -148,9 +151,25 @@ public class AudioCallingActivity extends TRTCBaseActivity implements View.OnCli
         enterRoom();
     }
 
+    private void setEncodedDataProcessingListener(TRTCCloud trtcCloud) {
+        try {
+            JSONObject params = new JSONObject().put("listener",
+                    JavaCallCpp.sharedInstance().getEncodedDataProcessingListener());
+            JSONObject jsonApi = new JSONObject()
+                    .put("api", "setEncodedDataProcessingListener")
+                    .put("params", params);
+            trtcCloud.callExperimentalAPI(jsonApi.toString());
+        } catch (JSONException e) {
+            e.printStackTrace();
+            Log.e("cyh", "get error when setEncodedDataProcessingListener, err: " + e);
+        }
+    }
+
     protected void enterRoom() {
         mTRTCCloud = TRTCCloud.sharedInstance(getApplicationContext());
         mTRTCCloud.setListener(new TRTCCloudImplListener(AudioCallingActivity.this));
+
+        setEncodedDataProcessingListener(mTRTCCloud);
 
         TRTCCloudDef.TRTCParams trtcParams = new TRTCCloudDef.TRTCParams();
         trtcParams.sdkAppId = GenerateTestUserSig.SDKAPPID;
