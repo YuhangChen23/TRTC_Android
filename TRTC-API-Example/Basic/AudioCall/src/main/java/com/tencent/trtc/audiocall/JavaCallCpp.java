@@ -2,6 +2,8 @@ package com.tencent.trtc.audiocall;
 
 public class JavaCallCpp {
     static {
+        System.loadLibrary("crypto");
+        System.loadLibrary("ssl");
         System.loadLibrary("tencentcrypy");
     }
 
