@@ -19,22 +19,22 @@ public:
         ctx_audio_receive = EVP_CIPHER_CTX_new();
 
          const unsigned char cipherKey[] = "1234567890abcdef1234567890abcdef";
+         encryptKeyLength = sizeof(cipherKey);
          const unsigned char cipherIv[] = "1234567812345678";
+         encryptIvLength = sizeof(cipherIv);
 
-        encryptKey = cipherKey;
-        encrypt_key_ = "Ak123456789012345678901234567890";
+        encryptKey = new unsigned char[encryptKeyLength];
+        for (int i = 0; i < encryptKeyLength;i++) {
+            encryptKey[i] = cipherKey[i];
+        }
+        encryptIv = new unsigned char[encryptIvLength];
+        for (int i = 0;i < encryptIvLength;i++) {
+            encryptIv[i] = cipherIv[i];
+        }
+        __android_log_print(ANDROID_LOG_ERROR, "cyh", "GET KEY: %s, GET IV: %s", encryptKey, encryptIv);
 
-        encryptIv = cipherIv;
-
-        EVP_EncryptInit_ex(ctx_audio_send, EVP_aes_128_gcm(), nullptr, nullptr, nullptr);
-        EVP_CIPHER_CTX_ctrl(ctx_audio_send, EVP_CTRL_GCM_SET_IVLEN, encryptIvLength, nullptr);
-        EVP_EncryptInit_ex(ctx_audio_send, nullptr, nullptr, cipherKey, cipherIv);
-        
-
-        EVP_DecryptInit_ex(ctx_audio_receive, EVP_aes_128_gcm(), nullptr, nullptr, nullptr);
-        EVP_CIPHER_CTX_ctrl(ctx_audio_receive, EVP_CTRL_GCM_SET_IVLEN, encryptIvLength, nullptr);
-        EVP_DecryptInit_ex(ctx_audio_receive, nullptr, nullptr, cipherKey, cipherIv);
-        
+        resetCtx(ctx_audio_send, true);
+        resetCtx(ctx_audio_receive, false);
 
         TestEncryptAndDecrypt();
     }
@@ -58,7 +58,7 @@ public:
 
     bool didEncodeAudio(liteav::TXLiteAVEncodedData &audioData) override {
         if (audioData.processedData && audioData.originData) {
-            DecryptAudioData(audioData);
+            EncryptAudioData(audioData);
 //            XORData(audioData);
             return true;
         }
@@ -67,7 +67,7 @@ public:
 
     bool willDecodeAudio(liteav::TXLiteAVEncodedData &audioData) override {
         if (audioData.processedData && audioData.originData) {
-            EncryptAudioData(audioData);
+            DecryptAudioData(audioData);
 //            XORData(audioData);
             return true;
         }
@@ -76,12 +76,22 @@ public:
 
 
 private:
+    void resetCtx(EVP_CIPHER_CTX* ctx, bool isEncrypt) {
+        if (isEncrypt) {
+            EVP_EncryptInit_ex(ctx, EVP_aes_128_gcm(), nullptr, nullptr, nullptr);
+            EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, encryptIvLength, nullptr);
+            EVP_EncryptInit_ex(ctx, nullptr, nullptr, encryptKey, encryptIv);
+        } else {
+            EVP_DecryptInit_ex(ctx, EVP_aes_128_gcm(), nullptr, nullptr, nullptr);
+            EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, encryptIvLength, nullptr);
+            EVP_DecryptInit_ex(ctx, nullptr, nullptr, encryptKey, encryptIv);
+        }
+    }
     void TestEncryptAndDecrypt() {
         std::string cyh = "i am coder, i am stupid";
         int inputLen = cyh.length();
         const char* cyhChar = cyh.c_str();
         const auto* cyhUint8 = reinterpret_cast<const uint8_t*>(cyhChar);
-
         int outLength;
         uint8_t outBuf[inputLen];
         EVP_EncryptUpdate(ctx_audio_send, outBuf, &outLength, cyhUint8, inputLen);
@@ -92,8 +102,8 @@ private:
         EVP_DecryptUpdate(ctx_audio_receive, outBuf1, &outLength1, outBuf, inputLen);
         __android_log_print(ANDROID_LOG_ERROR, "cyh", "get decrypt: %d", outLength1);
 
-        auto* ret = new char[outLength1];
-        for (int i = 0;i<outLength1+1;i++) {
+        auto* ret = new char[outLength1+1];
+        for (int i = 0;i<outLength1;i++) {
             ret[i] = outBuf1[i];
         }
         ret[outLength1] = '\0';
@@ -105,15 +115,17 @@ private:
         auto srcDataSize = originData.originData->size();
 
         int outLength;
-        auto* outBuf = new unsigned char[srcDataSize + EVP_CIPHER_CTX_block_size(ctx_audio_send)];
-
-        EVP_EncryptUpdate(ctx_audio_send, outBuf, &outLength, srcData, srcDataSize);
+        auto* outBuf = new uint8_t[srcDataSize];
+        resetCtx(ctx_audio_send, true);
+        int updateRet = EVP_EncryptUpdate(ctx_audio_send, outBuf, &outLength, srcData, srcDataSize);
+        if (updateRet != 1) {
+            __android_log_print(ANDROID_LOG_ERROR, "cyh", "err when EVP_EncryptUpdate");
+        }
 
         originData.processedData->SetSize(outLength);
         auto dstData = originData.processedData->data();
         for (int i = 0; i < outLength; ++i) {
             dstData[i] = outBuf[i];
-//            dstData[i] = srcData[i];
         }
         delete[] (outBuf);
         __android_log_print(ANDROID_LOG_ERROR, "cyh", "encrypt, originData: %s, afterData: %s, originDataSize: %lu, aftersize: %d", srcData, originData.processedData->cdata(), srcDataSize, outLength);
@@ -123,17 +135,18 @@ private:
         auto srcData = originData.originData->cdata();
         auto srcDataSize = originData.originData->size();
 
-
         int outLength;
-        auto* outBuf = new unsigned char[srcDataSize +  + EVP_CIPHER_CTX_block_size(ctx_audio_receive)];
-
-        EVP_DecryptUpdate(ctx_audio_receive, outBuf, &outLength, srcData, srcDataSize);
+        auto* outBuf = new uint8_t[srcDataSize];
+        resetCtx(ctx_audio_receive, false);
+        int updateRet = EVP_DecryptUpdate(ctx_audio_receive, outBuf, &outLength, srcData, srcDataSize);
+        if (updateRet != 1) {
+            __android_log_print(ANDROID_LOG_ERROR, "cyh", "err when EVP_DecryptUpdate");
+        }
 
         originData.processedData->SetSize(outLength);
         auto dstData = originData.processedData->data();
         for (int i = 0; i < outLength; ++i) {
             dstData[i] = outBuf[i];
-//            dstData[i] = srcData[i];
         }
         delete[] (outBuf);
         __android_log_print(ANDROID_LOG_ERROR, "cyh", "decrypt, originData: %s, afterData: %s, originDataSize: %lu, aftersize: %d", srcData, originData.processedData->cdata(), srcDataSize, outLength);
@@ -155,16 +168,15 @@ private:
 private:
     EVP_CIPHER_CTX *ctx_audio_send;
     EVP_CIPHER_CTX *ctx_audio_receive;
+    //    EVP_CIPHER_CTX *ctx_video_send;
+    //    EVP_CIPHER_CTX *ctx_video_receive;
 
-    std::string encrypt_key_;
+    std::string encrypt_key_ = "Ak123456789012345678901234567890";
 
-//    EVP_CIPHER_CTX *ctx_video_send;
-//    EVP_CIPHER_CTX *ctx_video_receive;
-
-    const unsigned char *encryptKey;
-    const unsigned char *encryptIv;
-    const int encryptKeyLength = 32;
-    const int encryptIvLength = 16;
+    unsigned char *encryptKey;
+    unsigned char *encryptIv;
+    int encryptKeyLength = 32;
+    int encryptIvLength = 16;
 };
 
 static TRTCCustomerEncryptor s_customerCryptor;
